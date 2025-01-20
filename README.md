@@ -2,7 +2,7 @@
 
 ExPOS (Exponential Operating System) is a personal project that I am working on as part of my semester project to create an operating system called **MyExpos OS**. This is an open-source project aimed at understanding and implementing core operating system concepts such as process management, memory management, file systems, and system calls.
 
-The repository contains the codebase for the kernel, basic system utilities, and the architecture behind MyExpos OS. It is built from scratch using C and assembly, and can be emulated using QEMU or Bochs.
+The repository contains the codebase for the kernel, basic system utilities, and the architecture behind MyExpos OS.
 
 ## Key Features
 - Basic kernel development (process scheduling, interrupts, system calls)
