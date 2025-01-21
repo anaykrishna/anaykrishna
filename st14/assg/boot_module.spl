@@ -1,0 +1,169 @@
+//load library
+loadi(63,13);
+loadi(64,14);
+
+//load init
+loadi(65,7);
+loadi(66,8);
+
+//load int7
+loadi(16,29);
+loadi(17,30);
+
+//load int10
+loadi(22,35);
+loadi(23,36);
+
+//load exception
+loadi(2,15);
+loadi(3,16);
+
+//load timer
+loadi(4,17);
+loadi(5,18);
+
+//load Scheduler
+loadi(50,63);
+loadi(51,64);
+
+//Program to print even numbers(evens)
+loadi(83, 69);
+
+//primes.xsm
+loadi(89 ,70);
+
+//Initialize page table for init
+
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+[PTBR+20+0] = 63;
+[PTBR+20+1] = "0100";
+[PTBR+20+2] = 64;
+[PTBR+20+3] = "0100";
+
+[PTBR+20+4] = 78;
+[PTBR+20+5] = "0110";
+[PTBR+20+6] = 79;
+[PTBR+20+7] = "0110";
+
+[PTBR+20+8] = 65;
+[PTBR+20+9] = "0100";
+[PTBR+20+10] = 66;
+[PTBR+20+11] = "0100";
+[PTBR+20+12] = -1;
+[PTBR+20+13] = "0000";
+[PTBR+20+14] = -1;
+[PTBR+20+15] = "0000";
+
+[PTBR+20+16] = 76;
+[PTBR+20+17] = "0110";
+[PTBR+20+18] = 77;
+[PTBR+20+19] = "0110";
+
+//Process table entries for init
+[PROCESS_TABLE+16+1] = 1;
+[PROCESS_TABLE+16+4] = CREATED;
+[PROCESS_TABLE+16+11] = 80; //User area
+[PROCESS_TABLE+16+12] = 0; //kernel stack (offset)
+[PROCESS_TABLE+16+13] = 8*512;  //user stack
+[PROCESS_TABLE+16+14] = PAGE_TABLE_BASE+20; //PTBR
+[PROCESS_TABLE+16+15] = 10; //PTLR
+
+[76*512] = [65*512 + 1];
+
+//Page table for evens
+
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+[PTBR+40+0] = 63;
+[PTBR+40+1] = "0100";
+[PTBR+40+2] = 64;
+[PTBR+40+3] = "0100";
+
+[PTBR+40+4] = 84;		//Heap:84-85
+[PTBR+40+5] = "0110";
+[PTBR+40+6] = 85;
+[PTBR+40+7] = "0110";
+
+[PTBR+40+8] = 83;
+[PTBR+40+9] = "0100";
+[PTBR+40+10] = -1;
+[PTBR+40+11] = "0000";
+[PTBR+40+12] = -1;
+[PTBR+40+13] = "0000";
+[PTBR+40+14] = -1;
+[PTBR+40+15] = "0000";
+
+[PTBR+40+16] = 86;		//Stack:86-87
+[PTBR+40+17] = "0110";
+[PTBR+40+18] = 87;
+[PTBR+40+19] = "0110";
+
+//Process table entries for evens
+[PROCESS_TABLE+32+1] = 2;
+[PROCESS_TABLE+32+4] = CREATED;
+[PROCESS_TABLE+32+11] = 88; //User area
+[PROCESS_TABLE+32+12] = 0; //kernel stack (offset)
+[PROCESS_TABLE+32+13] = 8*512;  //user stack
+[PROCESS_TABLE+32+14] = PAGE_TABLE_BASE+40; //PTBR
+[PROCESS_TABLE+32+15] = 10; //PTLR
+
+[86*512] = [83*512 + 1];
+
+//Initialize page table for prime.xsm
+
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+[PTBR+60+0] = 63;
+[PTBR+60+1] = "0100";
+[PTBR+60+2] = 64;
+[PTBR+60+3] = "0100";
+
+[PTBR+60+4] = 90;
+[PTBR+60+5] = "0110";
+[PTBR+60+6] = 91;
+[PTBR+60+7] = "0110";
+
+[PTBR+60+8] = 89;
+[PTBR+60+9] = "0100";
+[PTBR+60+10] = -1;
+[PTBR+60+11] = "0000";
+[PTBR+60+12] = -1;
+[PTBR+60+13] = "0000";
+[PTBR+60+14] = -1;
+[PTBR+60+15] = "0000";
+
+[PTBR+60+16] = 92;
+[PTBR+60+17] = "0110";
+[PTBR+60+18] = 93;
+[PTBR+60+19] = "0110";
+
+//Process table entries for prime.xsm
+[PROCESS_TABLE+48+1] = 3;
+[PROCESS_TABLE+48+4] = CREATED;
+[PROCESS_TABLE+48+11] = 94; //User area
+[PROCESS_TABLE+48+12] = 0; //kernel stack (offset)
+[PROCESS_TABLE+48+13] = 8*512;  //user stack
+[PROCESS_TABLE+48+14] = PAGE_TABLE_BASE+60; //PTBR
+[PROCESS_TABLE+48+15] = 10; //PTLR
+
+[92*512] = [89*512 + 1];
+
+//set every other process table entry to TERMINATED
+[PROCESS_TABLE+16*4+4] = TERMINATED;
+[PROCESS_TABLE+16*5+4] = TERMINATED;
+[PROCESS_TABLE+16*6+4] = TERMINATED;
+[PROCESS_TABLE+16*7+4] = TERMINATED;
+[PROCESS_TABLE+16*8+4] = TERMINATED;
+[PROCESS_TABLE+16*9+4] = TERMINATED;
+[PROCESS_TABLE+16*10+4] = TERMINATED;
+[PROCESS_TABLE+16*11+4] = TERMINATED;
+[PROCESS_TABLE+16*12+4] = TERMINATED;
+[PROCESS_TABLE+16*13+4] = TERMINATED;
+[PROCESS_TABLE+16*14+4] = TERMINATED;
+[PROCESS_TABLE+16*15+4] = TERMINATED;
+
+return;

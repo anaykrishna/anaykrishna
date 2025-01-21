@@ -1,0 +1,33 @@
+int main(){
+decl
+	int n, i, n2, temp, flag;
+enddecl
+begin
+	//for n in 1 - 100
+	//for i in 2 - n/2
+	//if n % i == 0: flag = 1 dont print 
+
+	n = 1;
+	while(n <= 100) do
+		i = 2;
+		n2 = n/2;
+		flag = 0;
+		
+		while(i <= n2) do
+			temp = n % i;
+			if(temp == 0) then
+				flag = 1;
+				break;
+			endif;
+			i = i + 1;
+		endwhile;
+
+		if(flag == 0) then
+			temp = exposcall("Write", -2, n);
+		endif;
+
+		n = n + 1;
+	endwhile;
+	return 0;
+end
+}
