@@ -6,7 +6,7 @@ The repository contains the codebase for the kernel, basic system utilities, and
 
 ## Key Features
 - Basic kernel development (process scheduling, interrupts, system calls)
-- Memory management (paging and segmentation)
+- Memory management (paging and virtualization)
 - Simple file system for file and directory management
 - Device drivers for hardware interaction
 
