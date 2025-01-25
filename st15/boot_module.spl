@@ -114,6 +114,8 @@ PTLR = 10;
 
 [86*512] = [83*512 + 1];
 
+[TERMINAL_STATUS_TABLE] = 0;      //EDIT
+
 //set every other process table entry to TERMINATED
 [PROCESS_TABLE+16*3+4] = TERMINATED;
 [PROCESS_TABLE+16*4+4] = TERMINATED;
