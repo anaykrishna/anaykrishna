@@ -1,0 +1,46 @@
+alias ret_val R0;
+alias fn R1;
+alias arg R2;
+
+if(fn == 1) then
+	[SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1;				//increment the waitmem 
+	while([SYSTEM_STATUS_TABLE + 2] == 0) do
+		[PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE + 1] + 4] = WAIT_MEM;		//set stat to waitmem
+		multipush(R0, R1, R2);
+		call SCHEDULER;														//Busy loop Scheduler
+		multipop(R0, R1, R2);
+	endwhile;
+
+	[SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1;				//Decrememnt the waitmem and free mem
+	[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+	R3 = 0;
+	while(R3 < MAX_MEM_PAGE) do												//Find the free page
+		if([MEMORY_FREE_LIST + R3] == 0) then
+			ret_val = R3;		//Page found 
+			[MEMORY_FREE_LIST + R3] = 1;
+			break;
+		endif;
+		
+		R3 = R3 + 1;
+	endwhile;
+
+	return;
+endif;
+
+if(fn == 2) then
+	[MEMORY_FREE_LIST + arg] = [MEMORY_FREE_LIST + arg] - 1;
+	if([MEMORY_FREE_LIST + arg] == 0) then
+		[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] + 1;
+	    R3 = 1;
+	    while(R3 < 16) do
+			if([PROCESS_TABLE + 16 * R3 + 4] == WAIT_MEM) then 
+				[PROCESS_TABLE + 16 * R3 + 4] = READY;
+			endif;
+			
+			R3 = R3 + 1;
+	    endwhile;
+	endif;
+
+	return;
+endif;

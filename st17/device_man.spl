@@ -1,0 +1,47 @@
+alias ret_val R0;
+alias func_num R1;
+alias curr_pid R2;
+alias arg1 R3;
+
+if(func_num == 3) then
+    multipush(R0, R1, R2, R3);
+    R1 = 8;
+    //R2 already contails the curr_pid
+    call RESOURCE_MANAGER;
+    //ignore R0
+    multipop(R0, R1, R2, R3);
+
+    print R3;
+
+    multipush(R0, R1, R2, R3);
+    R1 = 9;
+    //R2 will be same
+    call RESOURCE_MANAGER;
+    R4 = R0; 							//return value
+    multipop(R0, R1, R2, R3);
+    R0 = R4; 							//Return value should be in R0
+    return;
+endif;
+
+if(func_num == 4)then
+	multipush(R0, R1, R2, R3);			// Acquire Terminal
+	R1 = 8;
+	//R2 already contails the curr_pid
+   	call RESOURCE_MANAGER;
+    //ignore R0
+    multipop(R0, R1, R2, R3);
+
+    read;								// read input
+
+    [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 4] = WAIT_TERMINAL;		//status change
+
+    multipush(R0, R1, R2, R3);			// Scheduler
+    call SCHEDULER;
+    multipop(R0, R1, R2, R3);
+
+	R4 = 512*[PTBR + 2*arg1/512] + arg1%512;				//Set the value in input buffer to the variable passed
+    breakpoint;
+    [R4] = [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 8];
+    return;
+    
+endif;
