@@ -58,6 +58,29 @@ loadi(3,16);
 loadi(4,17);
 loadi(5,18);
 
+//setting mem_free_list
+
+R0 = 0;
+while(R0 < 76) do
+    [MEMORY_FREE_LIST + R0] = 1;
+    R0 = R0 + 1;
+endwhile;
+
+while(R0 < 128) do
+    [MEMORY_FREE_LIST + R0] = 0;
+    R0 = R0 + 1;
+endwhile;
+
+R0 = 76;
+while(R0 < 83) do //These are the pages used for idle and init
+    [MEMORY_FREE_LIST + R0] = 1;
+    R0 = R0 + 1;
+endwhile;
+
+//Initialize system status table
+[SYSTEM_STATUS_TABLE + 2] = 45;
+[SYSTEM_STATUS_TABLE + 3] = 0;
+
 //Initialize page table for init
 
 PTBR = PAGE_TABLE_BASE;
