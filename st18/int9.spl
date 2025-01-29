@@ -1,0 +1,131 @@
+alias userSP R0;
+alias curr_pid R1;
+userSP = SP;								//save the userpointer and switch to ksatck
+curr_pid = [SYSTEM_STATUS_TABLE + 1];			
+
+[PROCESS_TABLE + 16 * curr_pid + 13] = SP;
+SP = [PROCESS_TABLE + 16 * curr_pid + 11] * 512;
+
+[PROCESS_TABLE + 16 * curr_pid + 9] = 9;	//syscall number for exec : 9
+
+alias file R2;
+file = [[PTBR + 2*(userSP - 3)/512] * 512 + (userSP - 3)%512];
+
+//Search for the file in inode table
+alias cnt R3;
+cnt = 0;
+while(cnt < 60) do
+	if([INODE_TABLE + 16*cnt + 0] == EXEC && [INODE_TABLE + 16*cnt + 1] == file) then
+		break;
+	endif;
+
+	cnt = cnt + 1;
+endwhile;
+
+if(cnt >= 60) then
+	[[PTBR + 2*(userSP - 1)/512]*512 + (userSP - 1)%512] = -1;
+	SP = [PROCESS_TABLE + 16*curr_pid + 13];
+	[PROCESS_TABLE + 16*curr_pid + 9] = 0;
+	ireturn;
+endif;
+
+//call  exit process from process manager
+multipush(R0, R1, R2, R3);
+R1 = 3;
+R2 = curr_pid;
+call PROCESS_MANAGER;
+multipop(R0, R1, R2, R3);
+
+//Reclaiming the Uarea page
+
+alias user_area_pgno R4;
+user_area_pgno = [PROCESS_TABLE + 16*curr_pid + 11];
+SP = user_area_pgno * 512 - 1;
+
+[SYSTEM_STATUS_TABLE+2] = [SYSTEM_STATUS_TABLE+2]-1;		//decrementing system status table and mem free list
+[MEMORY_FREE_LIST + user_area_pgno] = [MEMORY_FREE_LIST + user_area_pgno] + 1;
+
+[PROCESS_TABLE + 16*curr_pid + 4] = RUNNING;
+[PROCESS_TABLE + 16*curr_pid + 7] = cnt; 
+
+//set page table entries
+
+[PTBR + 0] = 63;		//library, only needed to be linked
+[PTBR + 1] = "0100";
+[PTBR + 2] = 64;
+[PTBR + 3] = "0100";
+
+multipush(R0, R1, R2, R3);		//alloting and setting the heap pages
+R1 = 1;
+call MEMORY_MANAGER;
+[PTBR + 4] = R0;
+[PTBR + 5] = "0110";
+R1 = 1;
+call MEMORY_MANAGER;
+[PTBR + 6] = R0;
+[PTBR + 7] = "0110";
+multipop(R0, R1, R2, R3);
+
+multipush(R0, R1, R2, R3);		//alloting ans setting the stack pages
+R1 = 1;
+call MEMORY_MANAGER;
+[PTBR + 16] = R0;
+[PTBR + 17] = "0110";
+R1 = 1;
+call MEMORY_MANAGER;
+[PTBR + 18] = R0;
+[PTBR + 19] = "0110";
+multipop(R0, R1, R2, R3);
+
+//Setting the code pages
+
+multipush(R0, R1, R2, R3);
+R1 = INODE_TABLE + 16*cnt + 8;
+R0 = 0;
+while(R0 < 4) do
+    if([R1 + R0] != -1) then
+        multipush(R0, R1);
+        R1 = 1; //get free page
+        call MEMORY_MANAGER;
+        R3 = R0;
+        multipop(R0, R1);
+        [PTBR + 8 + 2*R0 + 0] = R3;
+        [PTBR + 8 + 2*R0 + 1] = "0110";
+
+        //load the blocks
+        multipush(R0, R1, R2, R3, R4);
+        R2 = [SYSTEM_STATUS_TABLE+1]; //curr_pid
+        R3 = R3; //page number
+        R4 = [R1+R0]; //block number
+        R1 = 2; //disk load, we are using R1 in last line, so dont change before that
+        call DEVICE_MANAGER;
+        multipop(R0, R1, R2, R3, R4);
+
+    else
+        [PTBR + 8 + 2*R0 + 0] = -1;
+        [PTBR + 8 + 2*R0 + 1] = "0000";
+    endif;
+    R0 = R0 + 1;
+endwhile;
+
+multipop(R0, R1, R2, R3);
+
+//Initialzie Per Process Resource Table(8 entries, 2 words each)
+
+multipush(R0, R1);
+R0 = ([PROCESS_TABLE + 16*curr_pid + 11] + 1) * 512 - 16;
+R1 = 0;
+while(R1 < 16) do
+	[R0 + R1] = -1;
+	R1 = R1 + 2;
+endwhile;
+multipop(R0, R1);
+
+[512*[PTBR + 16]] = [[PTBR + 8]*512 + 1];		//entry point in the stack
+
+//user SP process table??
+
+SP = 8 * 512;
+[PROCESS_TABLE + 16 * curr_pid + 9] = 0;
+
+ireturn;
