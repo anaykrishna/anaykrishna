@@ -4,7 +4,7 @@ userSP = SP;								//save the userpointer and switch to ksatck
 curr_pid = [SYSTEM_STATUS_TABLE + 1];			
 
 [PROCESS_TABLE + 16 * curr_pid + 13] = SP;
-SP = [PROCESS_TABLE + 16 * curr_pid + 11] * 512;
+SP = [PROCESS_TABLE + 16 * curr_pid + 11] * 512 - 1;
 
 [PROCESS_TABLE + 16 * curr_pid + 9] = 9;	//syscall number for exec : 9
 
