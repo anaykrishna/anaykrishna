@@ -1,0 +1,80 @@
+alias usp R1;
+usp = SP;
+
+alias syscall_no R2;
+syscall_no = [[PTBR + 2*(usp-5)/512]*512 + (usp-5)%512];
+
+alias pid R3;
+pid = [SYSTEM_STATUS_TABLE + 1];
+
+[PROCESS_TABLE + 16*pid + 9] = syscall_no;		//change mod value
+
+alias ret_addr R4;
+ret_addr = [PTBR + 2*(usp-1)/512]*512 + (usp-1)%512;
+
+alias arg1 R5;
+arg1 = [[PTBR + 2*(usp-4)/512]*512 + (usp-4)%512];
+
+[PROCESS_TABLE + 16*pid + 13] = SP;				//change satck
+SP = [PROCESS_TABLE + 16*pid + 11]*512 - 1;
+
+//<<<<<<<<<<<<<<<<<<<<<FUNCTION DECLARATIONS>>>>>>>>>>>>>>>>>>>>>>>
+
+if(syscall_no == 11) then		//getpid
+	[ret_addr] = pid;
+	[PROCESS_TABLE + 16*pid + 9] = 0;
+	SP = usp;
+	ireturn;
+endif;
+
+if(syscall_no == 12) then		//getppid
+	[ret_addr] = [PROCESS_TABLE + 16*pid + 2];
+	[PROCESS_TABLE + 16*pid + 9] = 0;
+	SP = usp;
+	ireturn;
+endif;
+
+if(syscall_no == 13) then		//Wait
+	if(arg1 < 0 || arg1 >= 16 || arg1 == pid) then		//arg1 is the pid of the target process
+		[ret_addr] = -1;								//invalid pid
+		[PROCESS_TABLE + 16*pid + 9] = 0;
+		SP = usp;
+		ireturn;
+	endif;
+
+    if([PROCESS_TABLE + 16*arg1 + 4] == TERMINATED) then	//dont wait for teminated process
+		[ret_addr] = -1;								
+		[PROCESS_TABLE + 16*pid + 9] = 0;
+		SP = usp;
+		ireturn;
+    endif;
+
+    [PROCESS_TABLE + 16*pid + 4] = "WAIT_PROCESS";			//change state
+    [PROCESS_TABLE + 16*pid + 5] = arg1;
+
+    multipush(R1, R2, R3, R4, R5);							//call scheduler for other process
+	call SCHEDULER;
+    multipop(R1, R2, R3, R4, R5);
+
+    [ret_addr] = 0;											//0 indicate success
+	[PROCESS_TABLE + 16*pid + 9] = 0;						
+	SP = usp;
+	ireturn;
+endif;
+
+if(syscall_no == 14) then		//Signal
+	R6 = 0;
+	while(R6 < 16) do
+		if([PROCESS_TABLE + 16*R6 + 4] == WAIT_PROCESS 
+		   &&
+		   [PROCESS_TABLE + 16*R6 + 5] == pid
+		) then
+			[PROCESS_TABLE + 16*R6 + 4] = READY;
+		endif;
+		R6 = R6 + 1;
+	endwhile;
+
+	[PROCESS_TABLE + 16*pid + 9] = 0;
+	SP = usp;
+	ireturn;
+endif;
