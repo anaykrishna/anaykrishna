@@ -2,7 +2,7 @@ alias usp R1;
 usp = SP;
 
 alias syscall_no R2;
-syscall_no = [[PTBR + 2*(usp-5)/512]*512 + (usp-5)%512];
+syscall_no = [[PTBR + 2*(SP-5)/512]*512 + (SP-5)%512];
 
 alias pid R3;
 pid = [SYSTEM_STATUS_TABLE + 1];
@@ -49,15 +49,15 @@ if(syscall_no == 13) then		//Wait
 		ireturn;
     endif;
 
-    [PROCESS_TABLE + 16*pid + 4] = "WAIT_PROCESS";			//change state
+    [PROCESS_TABLE + 16*pid + 4] = WAIT_PROCESS;			//change state
     [PROCESS_TABLE + 16*pid + 5] = arg1;
 
     multipush(R1, R2, R3, R4, R5);							//call scheduler for other process
 	call SCHEDULER;
     multipop(R1, R2, R3, R4, R5);
 
-    [ret_addr] = 0;											//0 indicate success
-	[PROCESS_TABLE + 16*pid + 9] = 0;						
+	[PROCESS_TABLE + 16*pid + 9] = 0;
+    [ret_addr] = 0;											//0 indicate success						
 	SP = usp;
 	ireturn;
 endif;
