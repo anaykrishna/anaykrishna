@@ -1,0 +1,91 @@
+//<<<<<<<<<<<<<<<<<<VARIABLE DECLERATIONS>>>>>>>>>>>>>>>>>>>>
+alias usp R1;
+usp = SP;
+
+alias syscall_no R2;
+syscall_no = [[PTBR + 2*(SP-5)/512]*512 + (SP-5)%512];
+
+alias ret_addr R3;
+ret_addr = [PTBR + 2*(SP-1)/512]*512 + (SP-1)%512;
+
+alias arg1 R4;
+arg1 =  [[PTBR + 2*(SP-4)/512]*512 + (SP-4)%512];
+
+alias pid R5;
+pid = [SYSTEM_STATUS_TABLE + 1];
+
+alias resc_table R6;
+resc_table = ([PROCESS_TABLE + 16*pid + 11] + 1)*512 - 16;
+
+//<<<<<<<<<<<<<<<<<<<<<CONTEXT SWITCH>>>>>>>>>>>>>>>>>>>>>>>>>
+
+[PROCESS_TABLE + 16*pid + 13] = SP;
+SP = [PROCESS_TABLE + 16*pid + 11]*512 - 1;
+
+[PROCESS_TABLE + 16*pid + 9] = syscall_no;
+
+//<<<<<<<<<<<<<<<<<<<<<FUNCTION DECL>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+if(syscall_no == 17) then			//Semget
+	R7 = 0;
+	while(R7 < 16) do
+		if([resc_table + R7] == -1) then
+			break;
+		endif;
+		R7 = R7 + 2;
+	endwhile;
+
+	if(R7 >= 16) then			//if per_process_resc_table is full then return
+		[ret_addr] = -1;
+		[PROCESS_TABLE + 16*pid + 9] = 0;
+		SP = usp;
+		ireturn;
+	endif;
+
+    multipush(R1, R2, R3, R4, R5, R6, R7);	
+    R1 = 6; 		//acquire semaphore
+    R2 = pid; 		
+    call RESOURCE_MANAGER;
+    multipop(R1, R2, R3, R4, R5, R6, R7);
+
+    if(R0 == -1) then			//max semaphores reached, return
+		[ret_addr] = -2;
+		[PROCESS_TABLE + 16*pid + 9] = 0;
+		SP = usp;
+		ireturn;
+    endif;
+
+    [resc_table + R7] = SEMAPHORE;		//set the resource table
+    [resc_table + R7 + 1] = R0;
+
+    [ret_addr] = R7/2;			//index
+    [PROCESS_TABLE + 16*pid + 9] = 0;	//return
+ 	SP = usp;
+ 	ireturn;
+    
+endif;
+
+if(syscall_no == 18) then		//Semrelease
+	if(arg1 < 0 || arg1 >= 8) then		//invalid resc index
+		[ret_addr] = -1;
+		[PROCESS_TABLE + 16*pid + 9] = 0;
+		SP = usp;
+		ireturn;
+	endif;
+
+    multipush(R1, R2, R3, R4, R5, R6, R7);
+    R1 = 7; 					//Release semaphore
+    R2 = [resc_table + 2*arg1 + 1]; 
+    R3 = pid; 
+    call RESOURCE_MANAGER;
+    multipop(R1, R2, R3, R4, R5, R6, R7);
+
+    [resc_table + 2*arg1] = -1;		//reset the resc_table
+    [resc_table + 2*arg1 + 1] = -1;
+
+    [ret_addr] = 0;
+    [PROCESS_TABLE + 16*pid + 9] = 0;
+  	SP = usp;
+  	ireturn;
+  	
+endif;

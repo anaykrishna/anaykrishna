@@ -159,6 +159,7 @@ if(syscall_no == 4) then		//delete
         [R8 + R9] = -1;
         R9 = R9 + 1;
     endwhile;
+    [R8 + 2] = 0;					//size is reset to 0 not -1
 
     R8 = ROOT_FILE + 8*R7;			//invalidate root table
     R9 = 0;

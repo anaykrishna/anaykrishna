@@ -1,0 +1,24 @@
+[PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 13] = SP;		//Changing of Stack Pointer from usr to kernel
+SP = 512 * [PROCESS_TABLE + 16 * [SYSTEM_STATUS_TABLE+1] + 11]; 
+
+backup;
+
+[PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 4] = READY;	//just before scheduler change the current process to READY
+
+// Max Memory Usage(Assg2)
+multipush(R0,R1);
+alias prev R1; 
+prev = [SYSTEM_STATUS_TABLE + 24];
+if (128 - [SYSTEM_STATUS_TABLE + 2] > prev) then
+	[SYSTEM_STATUS_TABLE + 24] = 128 - [SYSTEM_STATUS_TABLE + 2];
+endif;
+multipop(R0,R1);
+
+call SCHEDULER;
+
+restore;
+
+SP = [PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1] + 13];
+[PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE + 1] + 9] = 0;
+
+ireturn;

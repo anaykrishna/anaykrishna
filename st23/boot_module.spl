@@ -110,6 +110,7 @@ endwhile;
 R0 = 0;
 
 //Initialize system status table
+[SYSTEM_STATUS_TABLE + 0] = 1;		//root
 [SYSTEM_STATUS_TABLE + 2] = 45;
 [SYSTEM_STATUS_TABLE + 3] = 0;
 
@@ -177,6 +178,7 @@ PTLR = 10;
 //Process table entries for init
 [PROCESS_TABLE+16+1] = 1;
 [PROCESS_TABLE+16+4] = CREATED;
+[PROCESS_TABLE + 16 + 3] = 1;			//????????????new???????????????
 [PROCESS_TABLE+16+11] = 80; //User area
 [PROCESS_TABLE+16+12] = 0; //kernel stack (offset)
 [PROCESS_TABLE+16+13] = 8*512;  //user stack
@@ -188,7 +190,7 @@ R0 = (80+1)*512 - 16;
 R1 = 0;
 while(R1 < 16) do
     [R0 + R1] = -1;
-    R1 = R1 + 2;
+    R1 = R1 + 1;
 endwhile;
 R0 = 0;
 R1 = 0;
@@ -201,24 +203,17 @@ while(R0 < 10) do
 endwhile;
 R0 = 0;
 
-//set every other process table entry to TERMINATED
-[PROCESS_TABLE+16*2+4] = TERMINATED;
-[PROCESS_TABLE+16*3+4] = TERMINATED;
-[PROCESS_TABLE+16*4+4] = TERMINATED;
-[PROCESS_TABLE+16*5+4] = TERMINATED;
-[PROCESS_TABLE+16*6+4] = TERMINATED;
-[PROCESS_TABLE+16*7+4] = TERMINATED;
-[PROCESS_TABLE+16*8+4] = TERMINATED;
-[PROCESS_TABLE+16*9+4] = TERMINATED;
-[PROCESS_TABLE+16*10+4] = TERMINATED;
-[PROCESS_TABLE+16*11+4] = TERMINATED;
-[PROCESS_TABLE+16*12+4] = TERMINATED;
-[PROCESS_TABLE+16*13+4] = TERMINATED;
-[PROCESS_TABLE+16*14+4] = TERMINATED;
-[PROCESS_TABLE+16*15+4] = TERMINATED;
+[DISK_MAP_TABLE + 10 + 4] = 65;
+[DISK_MAP_TABLE + 10 + 5] = 66;
 
-//For current EXPOS set userid to 1
-[PROCESS_TABLE + 16 + 3] = 1;
+//set every other process table entry to TERMINATED
+R0 = 2;
+while(R0 < 16) do
+    [PROCESS_TABLE + 16*R0 + 4] = TERMINATED;
+    R0 = R0 + 1;
+endwhile;
+
+R0 = 0;
 
 [76*512] = [65*512 + 1]; //init
 return;
