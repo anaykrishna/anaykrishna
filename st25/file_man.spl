@@ -123,7 +123,7 @@ if(fn_num == 3) then		//open
 		return;
 	endif;
 
-    if([INODE_TABLE + 16*R5 + 0] != DATA) then		//if not data file
+    if([INODE_TABLE + 16*R5 + 0] == EXEC) then		//if not data file
        R0 = -1;
        return;
     endif;
