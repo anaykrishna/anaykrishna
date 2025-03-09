@@ -1,0 +1,151 @@
+alias curr_pid R1;
+alias usp R2;
+curr_pid = [SYSTEM_STATUS_TABLE + 1];
+usp = SP;
+
+[PROCESS_TABLE + 16*curr_pid + 9] = 8;		//set mode flag
+
+[PROCESS_TABLE + 16*curr_pid + 13] = SP;	//save Usp and load Ksp
+SP = [PROCESS_TABLE + 16*curr_pid + 11]*512 - 1;
+
+multipush(R1, R2);
+R1 = 1;		//get free pcb
+call PROCESS_MANAGER;
+multipop(R1, R2);
+
+if(R0 == -1) then		//if no pid remaining then return back to the program
+	[[PTBR + 2*(usp-1)/512]*512 + (usp-1)%512] = -1;
+	[PROCESS_TABLE + 16*curr_pid + 9] = 0;
+	SP = usp;
+	ireturn;
+endif;
+
+alias ch_pid R3;
+ch_pid = R0;
+
+if([PTBR + 5] == "0000") then		//heap not allocated for parent
+	multipush(R1, R2, R3);
+	R1 = 1;
+	call MEMORY_MANAGER;
+	[PTBR + 4] = R0;
+	[PTBR + 5] = "1110";
+	
+	R1 = 1;
+	call MEMORY_MANAGER;
+	[PTBR + 6] = R0;
+	[PTBR + 7] = "1110";
+	multipop(R1, R2, R3);
+endif;
+
+multipush(R1, R2, R3);		//page for Uarea
+R1 = 1;
+call MEMORY_MANAGER;
+multipop(R1, R2, R3);
+
+//!!!!! The stack pages are allocated and set after initializing the PAGE TABLE for the child below !!!!!
+
+//Below pcb entries are copied to the child from the prarent
+[PROCESS_TABLE + 16*ch_pid + 3] = [PROCESS_TABLE + 16*curr_pid + 3];	//userid
+[PROCESS_TABLE + 16*ch_pid + 6] = [PROCESS_TABLE + 16*curr_pid + 6];	//swap flag
+[PROCESS_TABLE + 16*ch_pid + 7] = [PROCESS_TABLE + 16*curr_pid + 7];	//inode index
+[PROCESS_TABLE + 16*ch_pid + 10] = [PROCESS_TABLE + 16*curr_pid + 10];	//uarea swap status
+[PROCESS_TABLE + 16*ch_pid + 13] = [PROCESS_TABLE + 16*curr_pid + 13];	//same Ustack
+
+//Below pcb entries are specific for the child(PID, PTBR, PTLR iare already initialized in Get Pcd Entry)
+[PROCESS_TABLE + 16*ch_pid + 0] = 0;			//Tick
+[PROCESS_TABLE + 16*ch_pid + 2] = curr_pid;		//PPID
+[PROCESS_TABLE + 16*ch_pid + 9] = 0;			//mode flag
+[PROCESS_TABLE + 16*ch_pid + 11] = R0;			//Uarea page
+[PROCESS_TABLE + 16*ch_pid + 12] = 0;			//KTPR
+
+//Copy the per process Resource Table
+R4 = ([PROCESS_TABLE + 16*ch_pid + 11] + 1)*512 - 16;
+R5 = ([PROCESS_TABLE + 16*curr_pid + 11] + 1)*512 - 16;
+
+R6 = 0;
+while(R6 < 16) do
+	[R4 + R6] = [R5 + R6];
+	
+    if(R6 % 2 == 0 && [R4 + R6] == SEMAPHORE) then			//incrmement the processc count for child
+       R7 = [R4 + R6 + 1];			 //R7 holds semaphore table index
+       [SEMAPHORE_TABLE + 4*R7 + 1] = [SEMAPHORE_TABLE + 4*R7 + 1] + 1;
+    endif;
+    
+    if(R6 % 2 == 2 && [R4 + R6] == FILE) then				//incrememnt the file open count in op_file_table
+	   R7 = [R4 + R6 + 1]; 			//R7 holds open file table index;
+	   [OPEN_FILE_TABLE + 4*R7 + 1] = [OPEN_FILE_TABLE + 4*R7 + 1] + 1;
+    endif;
+    
+	R6 = R6 + 1;
+endwhile;
+
+//Copy Disk Map Table
+R4 = DISK_MAP_TABLE + 10*ch_pid;
+R5 = DISK_MAP_TABLE + 10*curr_pid;
+
+R6 = 2;			//skip libraries
+while(R6 < 10) do
+    [R4 + R6] = [R5 + R6];
+    R6 = R6 + 1;
+endwhile;
+
+//Set the Page Table for the child
+R4 = [PROCESS_TABLE + 16*ch_pid + 14];		//PTBR child
+R5 = [PROCESS_TABLE + 16*curr_pid + 14];	//PTBR of parent
+
+R6 = 0;
+while(R6 < 16) do		//looping through 0 to 15, since the stack pages are already allocated and set pt before
+	[R4 + R6] = [R5 + R6];
+	if(R6%2 == 0) then
+		[MEMORY_FREE_LIST + [R4 + R6]] = [MEMORY_FREE_LIST + [R4 + R6]] + 1; 
+	endif;
+	R6 = R6 + 1;
+endwhile;
+
+//Setting Stack pages
+multipush(R1, R2, R3, R4, R5);
+R1 = 1;
+call MEMORY_MANAGER;
+multipop(R1, R2, R3, R4, R5);
+[R4 + 16] = R0;
+[R4 + 17] = [R5 + 17];
+
+multipush(R1, R2, R3, R4, R5);
+R1 = 1;
+call MEMORY_MANAGER;
+multipop(R1, R2, R3, R4, R5);
+[R4 + 18] = R0;
+[R4 + 19] = [R5 + 19];
+
+//Copy Stack elements one by one
+R6 = 0;			//Stack page 1
+while(R6 < 512) do
+	[[R4 + 16]*512 + R6] = [[R5 + 16]*512 + R6]; 
+	R6 = R6 + 1;
+endwhile;
+
+R6 = 0;			//Stack page 2
+while(R6 < 512) do
+	[[R4 + 18]*512 + R6] = [[R5 + 18]*512 + R6]; 
+	R6 = R6 + 1;
+endwhile;
+
+//Store BP on top of kernel stack of child process
+[[PROCESS_TABLE + 16*ch_pid + 11]*512] = BP;
+
+//!!!!!!!!!!!!!!!!!!!!!Set state here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+[PROCESS_TABLE + 16*ch_pid + 4] = CREATED;		//State
+
+//Setting the return values to corresponding stacks
+
+//0 to the stack of the child
+alias ch_sp R9;
+R9 = [PROCESS_TABLE + 16*ch_pid + 13];
+[[R4 + 2*(ch_sp-1)/512] * 512 + (ch_sp-1)%512] = 0;
+
+//ch_pid to the stack of the parent
+[[R5 + 2*(usp-1)/512]*512 + (usp-1)%512] = ch_pid;
+
+[PROCESS_TABLE + 16*curr_pid + 9] = 0;
+SP = usp;
+ireturn;

@@ -1,0 +1,74 @@
+//<<<<<<<<<<<<<<<<<<<<<<<<<VARIABLE DECL>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+alias usp R1;
+usp = SP;
+
+alias ret_addr R2;
+ret_addr = [PTBR + 2*(usp-1)/512]*512 + (usp-1)%512;
+
+alias syscall_num R3;  //27 for login
+syscall_num = [[PTBR + 2*(usp-5)/512]*512 + (usp-5)%512];
+
+alias arg1 R4;		//username
+arg1 = [[PTBR + 2*(usp-4)/512]*512 + (usp-4)%512];
+
+alias arg2 R5;		//encryted password
+arg2 = [[PTBR + 2*(usp-3)/512]*512 + (usp-3)%512];
+
+alias pid R6;
+pid = [SYSTEM_STATUS_TABLE + 1];
+
+//<<<<<<<<<<<<<<<<<<<<<<<<<<<<CONTEXT SWITCH>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+[PROCESS_TABLE + 16*pid + 9] = syscall_num;
+
+[PROCESS_TABLE + 16*pid + 13] = usp;
+SP = [PROCESS_TABLE + 16*pid + 11]*512 - 1;
+
+//<<<<<<<<<<<<<<<<<<<<<<<<<<FUCNTION DECL>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+if(pid != 1) then		//not from login process(1)
+	[ret_addr] = -1;
+	goto return_to_user;
+endif;
+
+R7 = 0;
+while(R7 < MAX_USER_NUM) do
+	if([USER_TABLE + 2*R7] == arg1) then
+		break;
+	endif;
+	
+	R7 = R7 + 1;
+endwhile;
+
+if(R7 >= MAX_USER_NUM) then
+	[ret_addr] = -1;
+	goto return_to_user;
+endif;
+
+encrypt arg2;
+if([USER_TABLE + 2*R7 + 1] != arg2) then		//wrong password
+	[ret_addr] = -1;
+	goto return_to_user;
+endif;
+
+//if username and password are correct
+[PROCESS_TABLE + 16*2 + 3] = R7;			//user_id
+[PROCESS_TABLE + 16*2 + 4] = CREATED;	//state
+
+//set the login process to wait for the shell program
+[PROCESS_TABLE + 16*pid + 4] = WAIT_PROCESS;
+[PROCESS_TABLE + 16*pid + 5] = 2;
+
+[SYSTEM_STATUS_TABLE + 0] = R7;			//current userid
+
+multipush(R1, R2, R3, R4, R5, R6, R7);
+call SCHEDULER;
+multipop(R1, R2, R3, R4, R5, R6, R7);
+
+goto return_to_user;
+
+
+return_to_user:
+	[PROCESS_TABLE + 16*pid + 9] = 0;
+	SP = usp;
+	ireturn;
