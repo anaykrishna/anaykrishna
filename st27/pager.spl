@@ -1,0 +1,204 @@
+alias func_num R1;
+alias arg1 R2;		//pid
+
+if(func_num == 1) then		//Swap_out
+	R3 = -1;		//flag
+
+	R4 = 3;			//check for WAIT_PROCESS
+	while(R4 < 15) do
+		if([PROCESS_TABLE + 16*R4 + 6] == 0 && [PROCESS_TABLE + 16*R4 + 4] == WAIT_PROCESS) then
+			R3 = R4;
+			break;
+		endif;
+		inline "INR R4";		//cost cutting
+	endwhile;
+
+	if(R3 == -1) then		//check for WAIT_SEMAPHORE
+        R4 = 3;
+        while(R4 < 15) do
+            if([PROCESS_TABLE + 16*R4 + 6] == 0 && [PROCESS_TABLE + 16*R4 + 4] == WAIT_SEMAPHORE) then
+                R3 = R4;
+                break;
+            endif;
+            
+            inline "INR R4";
+        endwhile;
+	endif;
+
+    if(R3 == -1) then		//highest tick value
+        R4 = 3;
+        while(R4 < 15) do
+            R5 = PROCESS_TABLE + 16*R4;
+            if([R5 + 4] == CREATED || [R5 + 4] == TERMINATED || [R5 + 4] == ALLOCATED || [R5 + 6] == 1) then
+                inline "INR R4";
+                continue;
+            endif;
+
+            if(R3 == -1 || [R5] > [PROCESS_TABLE + 16*R3]) then
+                R3 = R4;
+            endif;
+
+            inline "INR R4";
+        endwhile;
+    endif;
+
+    if(R3 == -1) then		//no process to swap out
+		[SYSTEM_STATUS_TABLE + 5] = 0;
+		R0 = 0;
+		return;
+    endif;
+
+	alias swapped_pid R3;
+	[PROCESS_TABLE + 16*swapped_pid + 0] = 0;		//reset tick
+
+    alias ptbr R4;
+    ptbr = [R5 + 14];
+
+    //We'll be only removing code pages, nonshared heaps and stacks
+    //Removing code pages
+    R5 = 4;
+    while(R5 < 8) do
+        if([ptbr + 2*R5 + 1] != "0000") then
+            multipush(R1, R2, R3, R4, R5);
+            R1 = RELEASE_PAGE;		//Since the code pages are present in the disk no need to store(dmt)
+            R2 = [ptbr + 2*R5];
+            call MEMORY_MANAGER;
+            multipop(R1, R2, R3, R4, R5);
+
+            [ptbr + 2*R5] = -1;		//reset pt entry
+            [ptbr + 2*R5 + 1] = "0000";
+        endif;
+
+        inline "INR R5";
+    endwhile;
+
+    //Removing nonshared heap and stacks
+    R5 = 2;
+    while(R5 < 10) do
+        if(R5 < 4) then
+            if([ptbr + 2*R5 + 1] != "0000" && [MEMORY_FREE_LIST + [ptbr + 2*R5]] == 1) then
+                goto heap_stack_swap;  
+            else
+                goto update;
+            endif;
+        else
+            goto heap_stack_swap;
+        endif;
+    
+        heap_stack_swap:
+            multipush(R1, R2, R3, R4, R5);
+            R1 = GET_SWAP_BLOCK;
+            call MEMORY_MANAGER;
+            multipop(R1, R2, R3, R4, R5);
+
+            [DISK_MAP_TABLE + 10*swapped_pid + R5] = R0;
+
+            multipush(R1, R2, R3, R4, R5);
+            R1 = DISK_STORE;
+            R2 = 15; //pid
+            R3 = [ptbr + 2*R5];
+            R4 = R0;
+            call DEVICE_MANAGER;
+            multipop(R1, R2, R3, R4, R5);
+
+            multipush(R1, R2, R3, R4, R5);
+            R1 = RELEASE_PAGE;
+            R2 = [ptbr + 2*R5];
+            call MEMORY_MANAGER;
+            multipop(R1, R2, R3, R4, R5);
+
+            [ptbr + 2*R5] = -1;
+            [ptbr + 2*R5 + 1] = "0000";
+        
+        update:
+            if(R5 == 3) then
+                R5 = 8;
+            else
+                inline "INR R5";
+            endif;
+    endwhile;
+
+    [PROCESS_TABLE +  16*swapped_pid + 6] = 1;  //Set swap state to swap_out(1)
+
+    [SYSTEM_STATUS_TABLE + 4] = [SYSTEM_STATUS_TABLE + 4] + 1;	//increment the swap_count
+    [SYSTEM_STATUS_TABLE + 5] = 0;		//paging status reset
+    
+    R0 = 0;
+    return;
+endif;
+
+if(func_num == SWAP_IN) then		//swap_in
+	R3 = -1;
+	R4 = 3;
+	while(R4 < 15) do
+		if([PROCESS_TABLE + 16*R4 + 6] == 0 || [PROCESS_TABLE + 16*R4 + 4] != READY) then
+			inline "INR R4";
+			continue;
+		endif; 
+
+		if(R3 == -1 || [PROCESS_TABLE + 16*R4 + 0] > [PROCESS_TABLE + 16*R3 + 0]) then
+			R3 = R4;		//find highest only after looping through all
+		endif;
+
+		inline "INR R4";
+	endwhile;
+
+	if(R3 == -1) then		//no pages to swap in
+        [SYSTEM_STATUS_TABLE + 5] = 0;
+        R0 = 0;
+        return;
+	endif;
+
+    alias swap_in_pid R3;
+    [PROCESS_TABLE + 16*swap_in_pid] = 0;
+
+    alias ptbr R4;
+    ptbr = [PROCESS_TABLE + 16*swap_in_pid + 14];
+
+    R5 = 2;
+    while(R5 < 10) do
+        if([DISK_MAP_TABLE + 10*swap_in_pid + R5] == -1) then	//skipping to stack pages
+            R5 = 8;
+            continue;
+        endif;
+
+        multipush(R1, R2, R3, R4, R5);
+        R1 = GET_FREE_PAGE;
+        call MEMORY_MANAGER;
+        multipop(R1, R2, R3, R4, R5);
+        
+		R6 = R0;
+
+        multipush(R1, R2, R3, R4, R5, R6);
+        R1 = DISK_LOAD;
+        R2 = 15;		//pid;
+        R4 = [DISK_MAP_TABLE + 10*swap_in_pid + R5];  
+        R3 = R0;
+        call DEVICE_MANAGER;
+        multipop(R1, R2, R3, R4, R5, R6);
+
+        [ptbr + 2*R5] = R6;
+        [ptbr + 2*R5 + 1] = "0110";
+
+        multipush(R1, R2, R3, R4, R5, R6);
+        R1 = RELEASE_BLOCK;
+        R2 = [DISK_MAP_TABLE + 10*swap_in_pid + R5];
+        call MEMORY_MANAGER;
+        multipop(R1, R2, R3, R4, R5, R6);
+
+        [DISK_MAP_TABLE + 10*swap_in_pid + R5] = -1;
+
+        if(R5 == 3) then
+            R5 = 8;
+        else
+            inline "INR R5";
+        endif;
+    endwhile;
+
+    [PROCESS_TABLE + 16*swap_in_pid + 6] = 0;
+    
+    [SYSTEM_STATUS_TABLE + 4] = [SYSTEM_STATUS_TABLE + 4] - 1;
+    [SYSTEM_STATUS_TABLE + 5] = 0;
+    
+    return;
+endif;

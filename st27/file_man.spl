@@ -1,0 +1,217 @@
+alias fn_num R1;
+alias arg1 R2;
+alias arg2 R3;
+alias arg3 R4;
+
+if(fn_num == 1) then		//buffered write
+	//disk block no, offset, physical mem location
+	alias buffer_no R5;
+	buffer_no = arg1%4;
+
+	multipush(R1, R2, R3, R4, R5);
+    R1 = 1;  				//acquire buffer
+    R2 = buffer_no;
+    R3 = [SYSTEM_STATUS_TABLE + 1];
+    call RESOURCE_MANAGER;
+    multipop(R1, R2, R3, R4, R5);	
+
+	alias buffer_entry R6;
+    buffer_entry = BUFFER_TABLE + 4*buffer_no;
+
+    if([buffer_entry + 0] != arg1) then			//block not already present
+        if([buffer_entry + 1] == 1) then		//if dirty bit is set
+            multipush(R1, R2, R3, R4, R5, R6);
+            R1 = 1;  						//disk store
+            R2 = [SYSTEM_STATUS_TABLE + 1];
+            R3 = BUFFER_BASE + buffer_no;	//Page no
+            R4 = [buffer_entry + 0];  		//block no
+            call DEVICE_MANAGER;
+            multipop(R1, R2, R3, R4, R5, R6);
+            
+            [R6 + 1] = 0;					//reset dirty bit
+        endif;
+
+        multipush(R1, R2, R3, R4, R5, R6);
+        R1 = 2;  							//disk load
+        R4 = arg1;  						//block no 
+        R2 = [SYSTEM_STATUS_TABLE + 1];
+        R3 = BUFFER_BASE + buffer_no; 		//Page no
+        call DEVICE_MANAGER;
+        multipop(R1, R2, R3, R4, R5, R6);
+
+        [buffer_entry + 0] = arg1;			//disk block number
+    endif;
+
+    [(BUFFER_BASE + buffer_no)*512 + arg2] = arg3;
+    [buffer_entry + 1] = 1;					//set dirty bit;
+
+    multipush(R1, R2, R3, R4, R5, R6);
+    R1 = 2;									//release buffer 
+    R2 = buffer_no;
+    R3 = [SYSTEM_STATUS_TABLE + 1];
+    call RESOURCE_MANAGER;
+    multipop(R1, R2, R3, R4, R5, R6);
+
+    R0 = 0;
+    return;
+endif;
+
+if(fn_num == 2) then		//buffered read		
+	//disk block no, offset, physical mem location
+	alias buffer_no R5;
+	buffer_no = arg1%4;
+
+    multipush(R1, R2, R3, R4, R5);
+    R1 = 1;  				//acquire buffer
+    R2 = buffer_no;
+    R3 = [SYSTEM_STATUS_TABLE + 1];
+    call RESOURCE_MANAGER;
+    multipop(R1, R2, R3, R4, R5);
+
+    alias buffer_entry R6;
+    buffer_entry = BUFFER_TABLE + 4*buffer_no;
+
+    if([buffer_entry + 0] != arg1) then			//block not already present
+        if([buffer_entry + 1] == 1) then		//if dirty bit is set
+            multipush(R1, R2, R3, R4, R5, R6);
+            R1 = 1;  						//disk store
+            R2 = [SYSTEM_STATUS_TABLE + 1];
+            R3 = BUFFER_BASE + buffer_no;	//Page no
+            R4 = [buffer_entry + 0];  		//block no
+            call DEVICE_MANAGER;
+            multipop(R1, R2, R3, R4, R5, R6);
+            
+            [R6 + 1] = 0;					//reset dirty bit
+        endif;
+
+        multipush(R1, R2, R3, R4, R5, R6);
+        R1 = 2;  							//disk load
+        R4 = arg1;  						//block no 
+        R2 = [SYSTEM_STATUS_TABLE + 1];
+        R3 = BUFFER_BASE + buffer_no; 		//Page no
+        call DEVICE_MANAGER;
+        multipop(R1, R2, R3, R4, R5, R6);
+
+        [buffer_entry + 0] = arg1;			//disk block number
+    endif;
+
+    [arg3] = [(BUFFER_BASE + buffer_no)*512 + arg2];		//read value to arg3(destination)
+
+    multipush(R1, R2, R3, R4);
+    R1 = 2;  								//release buffer
+    R2 = buffer_no;
+    R3 = [SYSTEM_STATUS_TABLE + 1];
+    call RESOURCE_MANAGER;
+    multipop(R1, R2, R3, R4);
+
+    R0 = 0;
+    return;
+endif;
+
+if(fn_num == 3) then		//open
+	R5 = 0;
+	while(R5 < MAX_FILE_NUM) do
+		if([INODE_TABLE + 16*R5 + 1] == arg1) then
+			break;
+		endif;
+
+		R5 = R5 + 1;
+	endwhile;
+
+	if(R5 >= MAX_FILE_NUM) then		//file not found
+		R0 = -1;
+		return;
+	endif;
+
+    if([INODE_TABLE + 16*R5 + 0] == EXEC) then		//if not data file
+       R0 = -1;
+       return;
+    endif;
+
+    multipush(R1, R2, R3, R4, R5);
+    R1 = 4; 										//acquire inode
+    R2 = R5;
+    R3 = [SYSTEM_STATUS_TABLE + 1];
+    call RESOURCE_MANAGER;
+    multipop(R1, R2, R3, R4, R5);
+
+    if(R0 == -1) then							//acquire inode failed
+		return;
+   	endif;
+	
+    R6 = 0;
+    while(R6 < MAX_OPENFILE_NUM) do			//finding openfile index using inode index = -1
+        if([OPEN_FILE_TABLE + 4*R6 + 0] == -1) then
+            break;
+        endif;
+        R6 = R6 + 1;
+    endwhile;
+
+    if(R6 >= MAX_OPENFILE_NUM) then
+        multipush(R1, R2, R3, R4, R5);		
+        R1 = 5;  								//release inode
+        R2 = R5;
+        R3 = [SYSTEM_STATUS_TABLE + 1];
+        call RESOURCE_MANAGER;
+        multipop(R1, R2, R3, R4, R5);
+
+        R0 = -2;						//exit value for 
+        return;
+    endif;
+
+
+	//if the file is root then no need to worry update the file status table just set inode index, only for others
+    if(arg1 == "root") then
+    	[OPEN_FILE_TABLE + 4*R6 + 0] = INODE_ROOT;  //inode index
+    else
+		R7 = FILE_STATUS_TABLE + 4*R5;
+		if([R7 + 1] == -1) then			//open file count
+			[R7 + 1] = 1;
+		else
+			[R7 + 1] = [R7 + 1] + 1;
+		endif;
+
+		[OPEN_FILE_TABLE + 4*R6 + 0] = R5;		//inode index
+    endif;
+
+	[OPEN_FILE_TABLE + 4*R6 + 1] = 1;			//open instance count
+ 	[OPEN_FILE_TABLE + 4*R6 + 2] = 0;			//Lseek
+
+    multipush(R1, R2, R3, R4, R5);
+    R1 = 5; 								 	//release inode
+    R2 = R5;
+    R3 = [SYSTEM_STATUS_TABLE + 1];
+    call RESOURCE_MANAGER;
+    multipop(R1, R2, R3, R4, R5);
+
+    R0 = R6;			//return value is the open file table index
+    return;
+endif;
+
+
+if(fn_num == 4) then		//close
+	alias open_entry R7;
+	open_entry = OPEN_FILE_TABLE + 4*arg1;
+
+	alias inode_index R5;
+	inode_index = [open_entry + 0];
+
+	[open_entry + 1] = [open_entry + 1] - 1;		//decrement open(share) count
+
+	if([open_entry + 1] == 0) then					//no more sharing
+		[open_entry + 0] = -1;
+		[open_entry + 1] = -1;
+		[open_entry + 2] = -1;
+
+		if(inode_index != INODE_ROOT) then			//decrement the open instance count for non-root file
+			[FILE_STATUS_TABLE + 4*R5 + 1] = [FILE_STATUS_TABLE + 4*R5 + 1] - 1;
+		endif;
+
+		if([FILE_STATUS_TABLE + 4*R5 + 1] == 0) then		//file is no longer open
+			[FILE_STATUS_TABLE + 4*R5 + 1] = -1;
+		endif;
+	endif;
+
+	R0 = 0;			//success
+	return;
+endif;
