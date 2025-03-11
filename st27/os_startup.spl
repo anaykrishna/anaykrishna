@@ -13,10 +13,10 @@ call BOOT_MODULE;
 PTBR = PAGE_TABLE_BASE;
 PTLR = 10;
 
-[PTBR+0] = 63;
-[PTBR+1] = "0100";  // Ref Valid Write Dirty
-[PTBR+2] = 64;
-[PTBR+3] = "0100";
+[PTBR+0] = -1;
+[PTBR+1] = "0000";  // Ref Valid Write Dirty
+[PTBR+2] = -1;
+[PTBR+3] = "0000";
 
 [PTBR+4] = -1;
 [PTBR+5] = "0000";
@@ -37,6 +37,7 @@ PTLR = 10;
 [PTBR+18] = -1;
 [PTBR+19] = "0000";
 
+[PROCESS_TABLE + 0] = 0;
 [PROCESS_TABLE + 1] = 0;
 [PROCESS_TABLE + 3] = 0;		//kernel
 [PROCESS_TABLE + 4] = RUNNING;
@@ -89,5 +90,7 @@ R0 = PROCESS_TABLE + 15*16;
 
 [81*512] = [69*512 + 1];
 
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
 SP = 8*512;
 ireturn;
