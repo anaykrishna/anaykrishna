@@ -1,7 +1,7 @@
 - 👋 Hi, I’m @anaykrishna
-- 👀 I’m interested in Competitive Programming and Cybersecurity.
-- 🌱 I’m currently learning Ethical Hacking and AI
-- 💞️ I’m looking to collaborate on Cybersecurity related projects
+- 👀 I’m interested in Competitive Programming, Networks and Cybersecurity.
+- 🌱 I’m currently learning Networking
+- 💞️ I’m looking to collaborate on Cybersecurity/Networking related projects
 - 📫 How to reach me @ www.linkedin.com/in/anay-krishna-a07132280
 - 😄 Pronouns: He/Him
 - ⚡ Fun fact: 😁
